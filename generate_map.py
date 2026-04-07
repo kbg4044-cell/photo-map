@@ -77,8 +77,7 @@ def get_date(filepath):
         pass
     return ''
 
-def cluster_photos(photos, threshold=0.0005):
-    """가까운 사진들을 하나의 클러스터로 묶기 (약 50m 이내)"""
+def cluster_photos(photos, threshold=0.001):
     clusters = []
     used = set()
     for i, p in enumerate(photos):
@@ -117,6 +116,7 @@ def main():
 
     clusters = cluster_photos(photos_data)
     clusters_json = json.dumps(clusters, ensure_ascii=False)
+    total = len(photos_data)
 
     html = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -126,44 +126,33 @@ def main():
   <title>나의 포토맵</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
-    * {{ margin:0; padding:0; box-sizing:border-box; }}
-    body {{ font-family:'Malgun Gothic',sans-serif; background:#0f0f1a; color:#fff; height:100vh; display:flex; flex-direction:column; }}
-    header {{ padding:12px 20px; background:rgba(255,255,255,.06); border-bottom:1px solid rgba(255,255,255,.1); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }}
-    header h1 {{ font-size:1.1rem; font-weight:500; }}
-    .badge {{ background:rgba(29,158,117,.25); border:1px solid #1D9E75; color:#5DCAA5; padding:3px 12px; border-radius:20px; font-size:.8rem; }}
-    #map {{ flex:1; }}
-
-    /* 클러스터 마커 */
-    .cluster-marker {{
-      background:#1D9E75; color:#fff; border:2.5px solid #fff;
-      border-radius:50%; display:flex; align-items:center; justify-content:center;
-      font-size:12px; font-weight:500; box-shadow:0 2px 6px rgba(0,0,0,.4);
-    }}
-
-    /* 팝업 슬라이더 */
-    .popup-wrap {{ width:240px; }}
-    .slider-box {{ position:relative; overflow:hidden; border-radius:8px; background:#111; }}
-    .slider-box img {{ width:100%; height:160px; object-fit:cover; display:block; cursor:zoom-in; }}
-    .slide {{ display:none; }}
-    .slide.active {{ display:block; }}
-    .nav {{ display:flex; align-items:center; justify-content:space-between; padding:6px 4px 2px; }}
-    .nav button {{ background:rgba(255,255,255,.1); border:none; color:#fff; border-radius:6px; padding:3px 10px; cursor:pointer; font-size:14px; }}
-    .nav button:hover {{ background:rgba(255,255,255,.25); }}
-    .nav .counter {{ font-size:12px; color:#aaa; }}
-    .pname {{ font-size:.8rem; font-weight:500; color:#222; margin:6px 0 2px; word-break:break-all; }}
-    .pdate {{ font-size:.75rem; color:#1D9E75; }}
-    .pcoord {{ font-size:.72rem; color:#888; margin-top:2px; }}
-
-    /* 라이트박스 */
-    #lb {{ display:none; position:absolute; inset:0; background:rgba(0,0,0,.9); z-index:9999; flex-direction:column; align-items:center; justify-content:center; gap:14px; }}
-    #lb.on {{ display:flex; }}
-    #lb img {{ max-width:92vw; max-height:78vh; border-radius:10px; }}
-    #lb .meta {{ background:rgba(255,255,255,.12); padding:8px 20px; border-radius:20px; font-size:.85rem; text-align:center; }}
-    #lb .cls {{ position:absolute; top:16px; right:20px; font-size:1.6rem; cursor:pointer; opacity:.7; }}
-    #lb .cls:hover {{ opacity:1; }}
-    #lb .lb-nav {{ display:flex; gap:20px; }}
-    #lb .lb-nav button {{ background:rgba(255,255,255,.15); border:none; color:#fff; padding:8px 20px; border-radius:20px; cursor:pointer; font-size:1rem; }}
-    #lb .lb-nav button:hover {{ background:rgba(255,255,255,.3); }}
+    *{{margin:0;padding:0;box-sizing:border-box}}
+    body{{font-family:'Malgun Gothic',sans-serif;background:#0f0f1a;color:#fff;height:100vh;display:flex;flex-direction:column}}
+    header{{padding:12px 20px;background:rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}}
+    header h1{{font-size:1.1rem;font-weight:500}}
+    .badge{{background:rgba(29,158,117,.25);border:1px solid #1D9E75;color:#5DCAA5;padding:3px 12px;border-radius:20px;font-size:.8rem}}
+    #map{{flex:1}}
+    .cm{{background:#1D9E75;color:#fff;border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer}}
+    .leaflet-popup-content{{margin:10px 12px}}
+    .pw{{width:220px}}
+    .ph-wrap{{position:relative;background:#000;border-radius:8px;overflow:hidden}}
+    .ph-wrap img{{width:100%;height:155px;object-fit:cover;display:block;cursor:zoom-in}}
+    .ph-nav{{display:flex;align-items:center;justify-content:space-between;padding:5px 2px}}
+    .ph-btn{{background:#1D9E75;border:none;color:#fff;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:15px;font-weight:600}}
+    .ph-btn:hover{{background:#0F6E56}}
+    .ph-cnt{{font-size:12px;color:#555;font-weight:500}}
+    .pname{{font-size:.8rem;font-weight:600;color:#222;margin:4px 0 2px;word-break:break-all}}
+    .pdate{{font-size:.75rem;color:#1D9E75}}
+    .pcoord{{font-size:.72rem;color:#999;margin-top:1px}}
+    #lb{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;flex-direction:column;align-items:center;justify-content:center;gap:16px}}
+    #lb.on{{display:flex}}
+    #lb img{{max-width:92vw;max-height:76vh;border-radius:10px}}
+    #lb .lmeta{{background:rgba(255,255,255,.12);padding:8px 20px;border-radius:20px;font-size:.85rem;text-align:center}}
+    #lb .lcls{{position:absolute;top:16px;right:20px;font-size:1.8rem;cursor:pointer;opacity:.7;line-height:1}}
+    #lb .lcls:hover{{opacity:1}}
+    #lb .lnav{{display:flex;gap:16px}}
+    #lb .lnav button{{background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 24px;border-radius:20px;cursor:pointer;font-size:1rem}}
+    #lb .lnav button:hover{{background:rgba(255,255,255,.3)}}
   </style>
 </head>
 <body>
@@ -173,10 +162,10 @@ def main():
 </header>
 <div id="map"></div>
 <div id="lb">
-  <span class="cls" onclick="closeLb()">✕</span>
+  <span class="lcls" onclick="closeLb()">✕</span>
   <img id="lb-img" src="" alt="">
-  <div class="meta" id="lb-meta"></div>
-  <div class="lb-nav">
+  <div class="lmeta" id="lb-meta"></div>
+  <div class="lnav">
     <button onclick="lbMove(-1)">◀ 이전</button>
     <button onclick="lbMove(1)">다음 ▶</button>
   </div>
@@ -184,114 +173,94 @@ def main():
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const clusters = {clusters_json};
-const totalPhotos = clusters.reduce((s,c) => s+c.length, 0);
+const total = {total};
+let lbList=[], lbIdx=0;
 
-let lbPhotos = [], lbIdx = 0;
-
-function openLb(photos, idx) {{
-  lbPhotos = photos; lbIdx = idx;
-  updateLb();
+function openLb(list, idx){{
+  lbList=list; lbIdx=idx; updateLb();
   document.getElementById('lb').classList.add('on');
 }}
-function updateLb() {{
-  const p = lbPhotos[lbIdx];
-  document.getElementById('lb-img').src = p.url;
-  document.getElementById('lb-meta').textContent =
-    p.name + (p.date ? '  ·  ' + p.date : '') + '  (' + (lbIdx+1) + '/' + lbPhotos.length + ')';
+function updateLb(){{
+  const p=lbList[lbIdx];
+  document.getElementById('lb-img').src=p.url;
+  document.getElementById('lb-meta').textContent=
+    p.name+(p.date?' · '+p.date:'')+' ('+( lbIdx+1)+'/'+lbList.length+')';
 }}
-function lbMove(dir) {{
-  lbIdx = (lbIdx + dir + lbPhotos.length) % lbPhotos.length;
+function lbMove(d){{
+  lbIdx=(lbIdx+d+lbList.length)%lbList.length;
   updateLb();
 }}
-function closeLb() {{ document.getElementById('lb').classList.remove('on'); }}
-document.getElementById('lb').addEventListener('click', e => {{ if(e.target.id==='lb') closeLb(); }});
-document.addEventListener('keydown', e => {{
-  if(e.key==='Escape') closeLb();
-  if(e.key==='ArrowLeft') lbMove(-1);
-  if(e.key==='ArrowRight') lbMove(1);
+function closeLb(){{document.getElementById('lb').classList.remove('on');}}
+document.getElementById('lb').addEventListener('click',e=>{{if(e.target.id==='lb')closeLb();}});
+document.addEventListener('keydown',e=>{{
+  if(e.key==='Escape')closeLb();
+  if(e.key==='ArrowLeft')lbMove(-1);
+  if(e.key==='ArrowRight')lbMove(1);
 }});
 
-if (!clusters.length) {{
-  document.getElementById('cnt').textContent = '사진 없음';
-  document.getElementById('map').innerHTML =
-    '<p style="text-align:center;padding:80px;color:#555">photos/ 폴더에 GPS 사진을 올려보세요!</p>';
-}} else {{
-  document.getElementById('cnt').textContent = '📍 ' + totalPhotos + '장 / ' + clusters.length + '곳';
-
-  const map = L.map('map');
-  L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 19
+if(!clusters.length){{
+  document.getElementById('cnt').textContent='사진 없음';
+  document.getElementById('map').innerHTML='<p style="text-align:center;padding:80px;color:#555">photos/ 폴더에 GPS 사진을 올려보세요!</p>';
+}}else{{
+  document.getElementById('cnt').textContent='📍 '+total+'장 / '+clusters.length+'곳';
+  const map=L.map('map');
+  L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom:19
   }}).addTo(map);
 
-  const group = L.featureGroup();
+  const bounds=[];
+  clusters.forEach((photos,ci)=>{{
+    const lat=photos.reduce((s,p)=>s+p.lat,0)/photos.length;
+    const lng=photos.reduce((s,p)=>s+p.lng,0)/photos.length;
+    const n=photos.length;
+    const sz=n>1?38:14;
+    const icon=L.divIcon({{
+      className:'',
+      html:n>1
+        ?`<div class="cm" style="width:${{sz}}px;height:${{sz}}px">${{n}}</div>`
+        :`<div style="width:14px;height:14px;background:#1D9E75;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>`,
+      iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
+    }});
 
-  clusters.forEach(photos => {{
-    const lat = photos.reduce((s,p)=>s+p.lat,0)/photos.length;
-    const lng = photos.reduce((s,p)=>s+p.lng,0)/photos.length;
-    const count = photos.length;
-    const size = count > 1 ? 36 : 14;
+    const marker=L.marker([lat,lng],{{icon}}).addTo(map);
+    bounds.push([lat,lng]);
 
-    const icon = count > 1
-      ? L.divIcon({{
-          className: '',
-          html: `<div class="cluster-marker" style="width:${{size}}px;height:${{size}}px">${{count}}</div>`,
-          iconSize: [size, size], iconAnchor: [size/2, size/2]
-        }})
-      : L.divIcon({{
-          className: '',
-          html: '<div style="width:14px;height:14px;background:#1D9E75;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-          iconSize: [14,14], iconAnchor: [7,7]
-        }});
+    let cur=0;
+    const pid='p'+ci;
 
-    const marker = L.marker([lat, lng], {{icon}}).addTo(map);
-
-    const sliderId = 'sl' + Math.random().toString(36).slice(2);
-    const slides = photos.map((p,i) => `
-      <div class="slide ${{i===0?'active':''}}" id="${{sliderId}}_${{i}}">
-        <img src="${{p.url}}" onerror="this.style.display='none'"
-             onclick="openLb(${{JSON.stringify(photos).replace(/'/g,'&#39;')}},${{i}})">
-      </div>`).join('');
-
-    const popupHtml = `
-      <div class="popup-wrap">
-        <div class="slider-box">${{slides}}</div>
-        ${{photos.length > 1 ? `
-        <div class="nav">
-          <button onclick="slideMove('${{sliderId}}',-1,${{photos.length}})">◀</button>
-          <span class="counter" id="${{sliderId}}_cnt">1 / ${{photos.length}}</span>
-          <button onclick="slideMove('${{sliderId}}',1,${{photos.length}})">▶</button>
-        </div>` : ''}}
-        <div id="${{sliderId}}_info">
-          <div class="pname">${{photos[0].name}}</div>
-          <div class="pdate">${{photos[0].date || '날짜 없음'}}</div>
-          <div class="pcoord">${{photos[0].lat}}, ${{photos[0].lng}}</div>
+    function buildPopup(idx){{
+      const p=photos[idx];
+      const photoList=JSON.stringify(photos);
+      return `<div class="pw">
+        <div class="ph-wrap">
+          <img src="${{p.url}}" onerror="this.style.display='none'"
+               onclick='openLb(${{photoList}},${{idx}})'>
         </div>
+        ${{n>1?`<div class="ph-nav">
+          <button class="ph-btn" onclick="window['${{pid}}'](- 1)">◀</button>
+          <span class="ph-cnt">${{idx+1}} / ${{n}}</span>
+          <button class="ph-btn" onclick="window['${{pid}}'](1)">▶</button>
+        </div>`:''}}"
+        <div class="pname">${{p.name}}</div>
+        <div class="pdate">${{p.date||'날짜 없음'}}</div>
+        <div class="pcoord">${{p.lat}}, ${{p.lng}}</div>
       </div>`;
+    }}
 
-    marker.bindPopup(popupHtml, {{maxWidth:260}});
+    window[pid]=function(d){{
+      cur=(cur+d+n)%n;
+      marker.getPopup().setContent(buildPopup(cur));
+    }};
+
+    marker.bindPopup(buildPopup(0),{{maxWidth:260}});
   }});
 
-  function slideMove(id, dir, total) {{
-    const slides = document.querySelectorAll(`[id^="${{id}}_"]:not([id$="_cnt"]):not([id$="_info"])`);
-    let cur = 0;
-    slides.forEach((s,i) => {{ if(s.classList.contains('active')) cur = i; }});
-    slides[cur].classList.remove('active');
-    cur = (cur + dir + total) % total;
-    slides[cur].classList.add('active');
-    const cnt = document.getElementById(id+'_cnt');
-    if(cnt) cnt.textContent = (cur+1) + ' / ' + total;
+  if(bounds.length===1){{
+    map.setView(bounds[0],15);
+  }}else{{
+    map.fitBounds(bounds,{{padding:[40,40]}});
   }}
-  window.slideMove = slideMove;
-
-  map.fitBounds(group.getBounds ? group.getBounds() : [[35,126],[38,130]], {{padding:[40,40]}});
-  clusters.forEach(photos => {{
-    const lat = photos.reduce((s,p)=>s+p.lat,0)/photos.length;
-    const lng = photos.reduce((s,p)=>s+p.lng,0)/photos.length;
-    group.addLayer(L.marker([lat,lng]));
-  }});
-  map.addLayer(group);
-  if(clusters.length > 0) map.fitBounds(group.getBounds(), {{padding:[40,40]}});
 }}
 </script>
 </body>
