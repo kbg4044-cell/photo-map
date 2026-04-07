@@ -135,12 +135,11 @@ def main():
     .cm{{background:#1D9E75;color:#fff;border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer}}
     .leaflet-popup-content{{margin:10px 12px}}
     .pw{{width:220px}}
-    .ph-wrap{{position:relative;background:#000;border-radius:8px;overflow:hidden}}
-    .ph-wrap img{{width:100%;height:155px;object-fit:cover;display:block;cursor:zoom-in}}
-    .ph-nav{{display:flex;align-items:center;justify-content:space-between;padding:5px 2px}}
-    .ph-btn{{background:#1D9E75;border:none;color:#fff;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:15px;font-weight:600}}
+    .ph-wrap img{{width:100%;height:155px;object-fit:cover;display:block;cursor:zoom-in;border-radius:8px}}
+    .ph-nav{{display:flex;align-items:center;justify-content:space-between;padding:6px 0 2px}}
+    .ph-btn{{background:#1D9E75;border:none;color:#fff;border-radius:6px;padding:4px 14px;cursor:pointer;font-size:15px;font-weight:600}}
     .ph-btn:hover{{background:#0F6E56}}
-    .ph-cnt{{font-size:12px;color:#555;font-weight:500}}
+    .ph-cnt{{font-size:12px;color:#666;font-weight:500}}
     .pname{{font-size:.8rem;font-weight:600;color:#222;margin:4px 0 2px;word-break:break-all}}
     .pdate{{font-size:.75rem;color:#1D9E75}}
     .pcoord{{font-size:.72rem;color:#999;margin-top:1px}}
@@ -148,8 +147,7 @@ def main():
     #lb.on{{display:flex}}
     #lb img{{max-width:92vw;max-height:76vh;border-radius:10px}}
     #lb .lmeta{{background:rgba(255,255,255,.12);padding:8px 20px;border-radius:20px;font-size:.85rem;text-align:center}}
-    #lb .lcls{{position:absolute;top:16px;right:20px;font-size:1.8rem;cursor:pointer;opacity:.7;line-height:1}}
-    #lb .lcls:hover{{opacity:1}}
+    #lb .lcls{{position:absolute;top:16px;right:20px;font-size:1.8rem;cursor:pointer;opacity:.7}}
     #lb .lnav{{display:flex;gap:16px}}
     #lb .lnav button{{background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 24px;border-radius:20px;cursor:pointer;font-size:1rem}}
     #lb .lnav button:hover{{background:rgba(255,255,255,.3)}}
@@ -176,20 +174,16 @@ const clusters = {clusters_json};
 const total = {total};
 let lbList=[], lbIdx=0;
 
-function openLb(list, idx){{
+function openLb(list,idx){{
   lbList=list; lbIdx=idx; updateLb();
   document.getElementById('lb').classList.add('on');
 }}
 function updateLb(){{
   const p=lbList[lbIdx];
   document.getElementById('lb-img').src=p.url;
-  document.getElementById('lb-meta').textContent=
-    p.name+(p.date?' · '+p.date:'')+' ('+( lbIdx+1)+'/'+lbList.length+')';
+  document.getElementById('lb-meta').textContent=p.name+(p.date?' · '+p.date:'')+' ('+(lbIdx+1)+'/'+lbList.length+')';
 }}
-function lbMove(d){{
-  lbIdx=(lbIdx+d+lbList.length)%lbList.length;
-  updateLb();
-}}
+function lbMove(d){{lbIdx=(lbIdx+d+lbList.length)%lbList.length;updateLb();}}
 function closeLb(){{document.getElementById('lb').classList.remove('on');}}
 document.getElementById('lb').addEventListener('click',e=>{{if(e.target.id==='lb')closeLb();}});
 document.addEventListener('keydown',e=>{{
@@ -227,21 +221,25 @@ if(!clusters.length){{
     bounds.push([lat,lng]);
 
     let cur=0;
-    const pid='p'+ci;
+    const pid='fn'+ci;
 
-    function buildPopup(idx){{
+    function makePopup(idx){{
       const p=photos[idx];
-      const photoList=JSON.stringify(photos);
+      const pj=JSON.stringify(photos);
+      let nav='';
+      if(n>1){{
+        nav=`<div class="ph-nav">
+          <button class="ph-btn" onclick="window.${{pid}}(-1)">◀</button>
+          <span class="ph-cnt">${{idx+1}} / ${{n}}</span>
+          <button class="ph-btn" onclick="window.${{pid}}(1)">▶</button>
+        </div>`;
+      }}
       return `<div class="pw">
         <div class="ph-wrap">
           <img src="${{p.url}}" onerror="this.style.display='none'"
-               onclick='openLb(${{photoList}},${{idx}})'>
+               onclick='openLb(${{pj}},${{idx}})'>
         </div>
-        ${{n>1?`<div class="ph-nav">
-          <button class="ph-btn" onclick="window['${{pid}}'](- 1)">◀</button>
-          <span class="ph-cnt">${{idx+1}} / ${{n}}</span>
-          <button class="ph-btn" onclick="window['${{pid}}'](1)">▶</button>
-        </div>`:''}}"
+        ${{nav}}
         <div class="pname">${{p.name}}</div>
         <div class="pdate">${{p.date||'날짜 없음'}}</div>
         <div class="pcoord">${{p.lat}}, ${{p.lng}}</div>
@@ -250,10 +248,10 @@ if(!clusters.length){{
 
     window[pid]=function(d){{
       cur=(cur+d+n)%n;
-      marker.getPopup().setContent(buildPopup(cur));
+      marker.getPopup().setContent(makePopup(cur));
     }};
 
-    marker.bindPopup(buildPopup(0),{{maxWidth:260}});
+    marker.bindPopup(makePopup(0),{{maxWidth:260}});
   }});
 
   if(bounds.length===1){{
