@@ -137,9 +137,9 @@ def main():
                 print(f"  ⚠️  {f.name} → GPS 없음")
 
     # 전체 클러스터 (조 무관하게 같은 위치 묶기)
-    all_clusters = cluster_photos(photos_data, same_group_only=False)
+    all_clusters   = cluster_photos(photos_data, threshold=0.005, same_group_only=False)
     # 조별 클러스터 (같은 조끼리만 묶기)
-    group_clusters = cluster_photos(photos_data, same_group_only=True)
+    group_clusters = cluster_photos(photos_data, threshold=0.005, same_group_only=True)
 
     all_json   = json.dumps(all_clusters, ensure_ascii=False)
     group_json = json.dumps(group_clusters, ensure_ascii=False)
