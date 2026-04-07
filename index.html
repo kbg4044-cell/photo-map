@@ -6,22 +6,33 @@
   <title>나의 포토맵</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { font-family:'Malgun Gothic',sans-serif; background:#0f0f1a; color:#fff; height:100vh; display:flex; flex-direction:column; }
-    header { padding:12px 20px; background:rgba(255,255,255,.06); border-bottom:1px solid rgba(255,255,255,.1); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
-    header h1 { font-size:1.1rem; font-weight:500; }
-    .badge { background:rgba(29,158,117,.25); border:1px solid #1D9E75; color:#5DCAA5; padding:3px 12px; border-radius:20px; font-size:.8rem; }
-    #map { flex:1; }
-    #lb { display:none; position:absolute; inset:0; background:rgba(0,0,0,.88); z-index:9999; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
-    #lb.on { display:flex; }
-    #lb img { max-width:90vw; max-height:75vh; border-radius:10px; }
-    #lb .meta { background:rgba(255,255,255,.12); padding:8px 20px; border-radius:20px; font-size:.85rem; }
-    #lb .cls { position:absolute; top:16px; right:20px; font-size:1.6rem; cursor:pointer; opacity:.7; line-height:1; }
-    .pw { font-family:'Malgun Gothic',sans-serif; min-width:190px; }
-    .pw img { width:100%; height:145px; object-fit:cover; border-radius:7px; cursor:zoom-in; display:block; }
-    .pw .pname { font-size:.82rem; font-weight:500; margin:7px 0 2px; color:#222; word-break:break-all; }
-    .pw .pdate { font-size:.75rem; color:#1D9E75; }
-    .pw .pcoord { font-size:.72rem; color:#888; margin-top:2px; }
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Malgun Gothic',sans-serif;background:#0f0f1a;color:#fff;height:100vh;display:flex;flex-direction:column}
+    header{padding:12px 20px;background:rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+    header h1{font-size:1.1rem;font-weight:500}
+    .badge{background:rgba(29,158,117,.25);border:1px solid #1D9E75;color:#5DCAA5;padding:3px 12px;border-radius:20px;font-size:.8rem}
+    #map{flex:1}
+    .cm{background:#1D9E75;color:#fff;border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer}
+    .leaflet-popup-content{margin:10px 12px}
+    .pw{width:220px}
+    .ph-wrap{position:relative;background:#000;border-radius:8px;overflow:hidden}
+    .ph-wrap img{width:100%;height:155px;object-fit:cover;display:block;cursor:zoom-in}
+    .ph-nav{display:flex;align-items:center;justify-content:space-between;padding:5px 2px}
+    .ph-btn{background:#1D9E75;border:none;color:#fff;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:15px;font-weight:600}
+    .ph-btn:hover{background:#0F6E56}
+    .ph-cnt{font-size:12px;color:#555;font-weight:500}
+    .pname{font-size:.8rem;font-weight:600;color:#222;margin:4px 0 2px;word-break:break-all}
+    .pdate{font-size:.75rem;color:#1D9E75}
+    .pcoord{font-size:.72rem;color:#999;margin-top:1px}
+    #lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+    #lb.on{display:flex}
+    #lb img{max-width:92vw;max-height:76vh;border-radius:10px}
+    #lb .lmeta{background:rgba(255,255,255,.12);padding:8px 20px;border-radius:20px;font-size:.85rem;text-align:center}
+    #lb .lcls{position:absolute;top:16px;right:20px;font-size:1.8rem;cursor:pointer;opacity:.7;line-height:1}
+    #lb .lcls:hover{opacity:1}
+    #lb .lnav{display:flex;gap:16px}
+    #lb .lnav button{background:rgba(255,255,255,.15);border:none;color:#fff;padding:8px 24px;border-radius:20px;cursor:pointer;font-size:1rem}
+    #lb .lnav button:hover{background:rgba(255,255,255,.3)}
   </style>
 </head>
 <body>
@@ -31,51 +42,105 @@
 </header>
 <div id="map"></div>
 <div id="lb">
-  <span class="cls" onclick="closeLb()">✕</span>
+  <span class="lcls" onclick="closeLb()">✕</span>
   <img id="lb-img" src="" alt="">
-  <div class="meta" id="lb-meta"></div>
+  <div class="lmeta" id="lb-meta"></div>
+  <div class="lnav">
+    <button onclick="lbMove(-1)">◀ 이전</button>
+    <button onclick="lbMove(1)">다음 ▶</button>
+  </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const photos = [{"name": "1774490980582.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/1774490980582.jpg", "date": ""}, {"name": "20260329_124944.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/20260329_124944.jpg", "date": ""}, {"name": "20260329_124945.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/20260329_124945.jpg", "date": ""}];
-function openLb(src, name, date) {
-  document.getElementById('lb-img').src = src;
-  document.getElementById('lb-meta').textContent = name + (date ? '  ·  ' + date : '');
+const clusters = [[{"name": "1774490980582.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/1774490980582.jpg", "date": ""}, {"name": "20260329_124944.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/20260329_124944.jpg", "date": ""}, {"name": "20260329_124945.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/20260329_124945.jpg", "date": ""}]];
+const total = 3;
+let lbList=[], lbIdx=0;
+
+function openLb(list, idx){
+  lbList=list; lbIdx=idx; updateLb();
   document.getElementById('lb').classList.add('on');
 }
-function closeLb() { document.getElementById('lb').classList.remove('on'); }
-document.getElementById('lb').addEventListener('click', e => { if(e.target.id==='lb') closeLb(); });
-document.addEventListener('keydown', e => { if(e.key==='Escape') closeLb(); });
-if (!photos.length) {
-  document.getElementById('cnt').textContent = '사진 없음';
-  document.getElementById('map').innerHTML =
-    '<p style="text-align:center;padding:80px;color:#555;font-size:.95rem">photos/ 폴더에 GPS 사진을 올려보세요!</p>';
-} else {
-  document.getElementById('cnt').textContent = '📍 ' + photos.length + '장';
-  const map = L.map('map');
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom: 19
+function updateLb(){
+  const p=lbList[lbIdx];
+  document.getElementById('lb-img').src=p.url;
+  document.getElementById('lb-meta').textContent=
+    p.name+(p.date?' · '+p.date:'')+' ('+( lbIdx+1)+'/'+lbList.length+')';
+}
+function lbMove(d){
+  lbIdx=(lbIdx+d+lbList.length)%lbList.length;
+  updateLb();
+}
+function closeLb(){document.getElementById('lb').classList.remove('on');}
+document.getElementById('lb').addEventListener('click',e=>{if(e.target.id==='lb')closeLb();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeLb();
+  if(e.key==='ArrowLeft')lbMove(-1);
+  if(e.key==='ArrowRight')lbMove(1);
+});
+
+if(!clusters.length){
+  document.getElementById('cnt').textContent='사진 없음';
+  document.getElementById('map').innerHTML='<p style="text-align:center;padding:80px;color:#555">photos/ 폴더에 GPS 사진을 올려보세요!</p>';
+}else{
+  document.getElementById('cnt').textContent='📍 '+total+'장 / '+clusters.length+'곳';
+  const map=L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom:19
   }).addTo(map);
-  const icon = L.divIcon({
-    className: '',
-    html: '<div style="width:14px;height:14px;background:#1D9E75;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-    iconSize: [14,14], iconAnchor: [7,7]
-  });
-  const group = L.featureGroup();
-  photos.forEach(p => {
-    const marker = L.marker([p.lat, p.lng], {icon}).addTo(map);
-    marker.bindPopup(`
-      <div class="pw">
-        <img src="${p.url}" onerror="this.style.display='none'"
-             onclick="openLb('${p.url}','${p.name}','${p.date}')">
+
+  const bounds=[];
+  clusters.forEach((photos,ci)=>{
+    const lat=photos.reduce((s,p)=>s+p.lat,0)/photos.length;
+    const lng=photos.reduce((s,p)=>s+p.lng,0)/photos.length;
+    const n=photos.length;
+    const sz=n>1?38:14;
+    const icon=L.divIcon({
+      className:'',
+      html:n>1
+        ?`<div class="cm" style="width:${sz}px;height:${sz}px">${n}</div>`
+        :`<div style="width:14px;height:14px;background:#1D9E75;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>`,
+      iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
+    });
+
+    const marker=L.marker([lat,lng],{icon}).addTo(map);
+    bounds.push([lat,lng]);
+
+    let cur=0;
+    const pid='p'+ci;
+
+    function buildPopup(idx){
+      const p=photos[idx];
+      const photoList=JSON.stringify(photos);
+      return `<div class="pw">
+        <div class="ph-wrap">
+          <img src="${p.url}" onerror="this.style.display='none'"
+               onclick='openLb(${photoList},${idx})'>
+        </div>
+        ${n>1?`<div class="ph-nav">
+          <button class="ph-btn" onclick="window['${pid}'](- 1)">◀</button>
+          <span class="ph-cnt">${idx+1} / ${n}</span>
+          <button class="ph-btn" onclick="window['${pid}'](1)">▶</button>
+        </div>`:''}"
         <div class="pname">${p.name}</div>
-        <div class="pdate">${p.date || '날짜 정보 없음'}</div>
+        <div class="pdate">${p.date||'날짜 없음'}</div>
         <div class="pcoord">${p.lat}, ${p.lng}</div>
-      </div>`, {maxWidth: 220});
-    group.addLayer(marker);
+      </div>`;
+    }
+
+    window[pid]=function(d){
+      cur=(cur+d+n)%n;
+      marker.getPopup().setContent(buildPopup(cur));
+    };
+
+    marker.bindPopup(buildPopup(0),{maxWidth:260});
   });
-  map.fitBounds(group.getBounds(), {padding: [40,40]});
+
+  if(bounds.length===1){
+    map.setView(bounds[0],15);
+  }else{
+    map.fitBounds(bounds,{padding:[40,40]});
+  }
 }
 </script>
 </body>
