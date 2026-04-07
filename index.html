@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>나의 포토맵</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Malgun Gothic',sans-serif; background:#0f0f1a; color:#fff; height:100vh; display:flex; flex-direction:column; }
+    header { padding:12px 20px; background:rgba(255,255,255,.06); border-bottom:1px solid rgba(255,255,255,.1); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+    header h1 { font-size:1.1rem; font-weight:500; }
+    .badge { background:rgba(29,158,117,.25); border:1px solid #1D9E75; color:#5DCAA5; padding:3px 12px; border-radius:20px; font-size:.8rem; }
+    #map { flex:1; }
+    #lb { display:none; position:absolute; inset:0; background:rgba(0,0,0,.88); z-index:9999; flex-direction:column; align-items:center; justify-content:center; gap:14px; }
+    #lb.on { display:flex; }
+    #lb img { max-width:90vw; max-height:75vh; border-radius:10px; }
+    #lb .meta { background:rgba(255,255,255,.12); padding:8px 20px; border-radius:20px; font-size:.85rem; }
+    #lb .cls { position:absolute; top:16px; right:20px; font-size:1.6rem; cursor:pointer; opacity:.7; line-height:1; }
+    .pw { font-family:'Malgun Gothic',sans-serif; min-width:190px; }
+    .pw img { width:100%; height:145px; object-fit:cover; border-radius:7px; cursor:zoom-in; display:block; }
+    .pw .pname { font-size:.82rem; font-weight:500; margin:7px 0 2px; color:#222; word-break:break-all; }
+    .pw .pdate { font-size:.75rem; color:#1D9E75; }
+    .pw .pcoord { font-size:.72rem; color:#888; margin-top:2px; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>📸 나의 포토맵</h1>
+  <span class="badge" id="cnt">불러오는 중...</span>
+</header>
+<div id="map"></div>
+<div id="lb">
+  <span class="cls" onclick="closeLb()">✕</span>
+  <img id="lb-img" src="" alt="">
+  <div class="meta" id="lb-meta"></div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const photos = [];
+function openLb(src, name, date) {
+  document.getElementById('lb-img').src = src;
+  document.getElementById('lb-meta').textContent = name + (date ? '  ·  ' + date : '');
+  document.getElementById('lb').classList.add('on');
+}
+function closeLb() { document.getElementById('lb').classList.remove('on'); }
+document.getElementById('lb').addEventListener('click', e => { if(e.target.id==='lb') closeLb(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeLb(); });
+if (!photos.length) {
+  document.getElementById('cnt').textContent = '사진 없음';
+  document.getElementById('map').innerHTML =
+    '<p style="text-align:center;padding:80px;color:#555;font-size:.95rem">photos/ 폴더에 GPS 사진을 올려보세요!</p>';
+} else {
+  document.getElementById('cnt').textContent = '📍 ' + photos.length + '장';
+  const map = L.map('map');
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
+  }).addTo(map);
+  const icon = L.divIcon({
+    className: '',
+    html: '<div style="width:14px;height:14px;background:#1D9E75;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+    iconSize: [14,14], iconAnchor: [7,7]
+  });
+  const group = L.featureGroup();
+  photos.forEach(p => {
+    const marker = L.marker([p.lat, p.lng], {icon}).addTo(map);
+    marker.bindPopup(`
+      <div class="pw">
+        <img src="${p.url}" onerror="this.style.display='none'"
+             onclick="openLb('${p.url}','${p.name}','${p.date}')">
+        <div class="pname">${p.name}</div>
+        <div class="pdate">${p.date || '날짜 정보 없음'}</div>
+        <div class="pcoord">${p.lat}, ${p.lng}</div>
+      </div>`, {maxWidth: 220});
+    group.addLayer(marker);
+  });
+  map.fitBounds(group.getBounds(), {padding: [40,40]});
+}
+</script>
+</body>
+</html>
