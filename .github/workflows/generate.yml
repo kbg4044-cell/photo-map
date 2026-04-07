@@ -1,0 +1,25 @@
+name: 포토맵 자동 생성
+
+on:
+  push:
+    paths:
+      - 'photos/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: 코드 가져오기
+        uses: actions/checkout@v4
+
+      - name: Python으로 HTML 생성
+        run: python generate_map.py
+
+      - name: index.html 자동 커밋
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "지도 자동 업데이트"
+          file_pattern: index.html
