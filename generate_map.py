@@ -77,6 +77,24 @@ def get_date(filepath):
         pass
     return ''
 
+def cluster_photos(photos, threshold=0.0005):
+    """가까운 사진들을 하나의 클러스터로 묶기 (약 50m 이내)"""
+    clusters = []
+    used = set()
+    for i, p in enumerate(photos):
+        if i in used:
+            continue
+        cluster = [p]
+        used.add(i)
+        for j, q in enumerate(photos):
+            if j in used:
+                continue
+            if abs(p['lat']-q['lat']) < threshold and abs(p['lng']-q['lng']) < threshold:
+                cluster.append(q)
+                used.add(j)
+        clusters.append(cluster)
+    return clusters
+
 def main():
     photos_data = []
     exts = {'.jpg', '.jpeg', '.JPG', '.JPEG'}
@@ -97,7 +115,8 @@ def main():
         else:
             print(f"  ⚠️  {f.name} → GPS 없음, 스킵")
 
-    markers = json.dumps(photos_data, ensure_ascii=False)
+    clusters = cluster_photos(photos_data)
+    clusters_json = json.dumps(clusters, ensure_ascii=False)
 
     html = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -113,16 +132,38 @@ def main():
     header h1 {{ font-size:1.1rem; font-weight:500; }}
     .badge {{ background:rgba(29,158,117,.25); border:1px solid #1D9E75; color:#5DCAA5; padding:3px 12px; border-radius:20px; font-size:.8rem; }}
     #map {{ flex:1; }}
-    #lb {{ display:none; position:absolute; inset:0; background:rgba(0,0,0,.88); z-index:9999; flex-direction:column; align-items:center; justify-content:center; gap:14px; }}
+
+    /* 클러스터 마커 */
+    .cluster-marker {{
+      background:#1D9E75; color:#fff; border:2.5px solid #fff;
+      border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-size:12px; font-weight:500; box-shadow:0 2px 6px rgba(0,0,0,.4);
+    }}
+
+    /* 팝업 슬라이더 */
+    .popup-wrap {{ width:240px; }}
+    .slider-box {{ position:relative; overflow:hidden; border-radius:8px; background:#111; }}
+    .slider-box img {{ width:100%; height:160px; object-fit:cover; display:block; cursor:zoom-in; }}
+    .slide {{ display:none; }}
+    .slide.active {{ display:block; }}
+    .nav {{ display:flex; align-items:center; justify-content:space-between; padding:6px 4px 2px; }}
+    .nav button {{ background:rgba(255,255,255,.1); border:none; color:#fff; border-radius:6px; padding:3px 10px; cursor:pointer; font-size:14px; }}
+    .nav button:hover {{ background:rgba(255,255,255,.25); }}
+    .nav .counter {{ font-size:12px; color:#aaa; }}
+    .pname {{ font-size:.8rem; font-weight:500; color:#222; margin:6px 0 2px; word-break:break-all; }}
+    .pdate {{ font-size:.75rem; color:#1D9E75; }}
+    .pcoord {{ font-size:.72rem; color:#888; margin-top:2px; }}
+
+    /* 라이트박스 */
+    #lb {{ display:none; position:absolute; inset:0; background:rgba(0,0,0,.9); z-index:9999; flex-direction:column; align-items:center; justify-content:center; gap:14px; }}
     #lb.on {{ display:flex; }}
-    #lb img {{ max-width:90vw; max-height:75vh; border-radius:10px; }}
-    #lb .meta {{ background:rgba(255,255,255,.12); padding:8px 20px; border-radius:20px; font-size:.85rem; }}
-    #lb .cls {{ position:absolute; top:16px; right:20px; font-size:1.6rem; cursor:pointer; opacity:.7; line-height:1; }}
-    .pw {{ font-family:'Malgun Gothic',sans-serif; min-width:190px; }}
-    .pw img {{ width:100%; height:145px; object-fit:cover; border-radius:7px; cursor:zoom-in; display:block; }}
-    .pw .pname {{ font-size:.82rem; font-weight:500; margin:7px 0 2px; color:#222; word-break:break-all; }}
-    .pw .pdate {{ font-size:.75rem; color:#1D9E75; }}
-    .pw .pcoord {{ font-size:.72rem; color:#888; margin-top:2px; }}
+    #lb img {{ max-width:92vw; max-height:78vh; border-radius:10px; }}
+    #lb .meta {{ background:rgba(255,255,255,.12); padding:8px 20px; border-radius:20px; font-size:.85rem; text-align:center; }}
+    #lb .cls {{ position:absolute; top:16px; right:20px; font-size:1.6rem; cursor:pointer; opacity:.7; }}
+    #lb .cls:hover {{ opacity:1; }}
+    #lb .lb-nav {{ display:flex; gap:20px; }}
+    #lb .lb-nav button {{ background:rgba(255,255,255,.15); border:none; color:#fff; padding:8px 20px; border-radius:20px; cursor:pointer; font-size:1rem; }}
+    #lb .lb-nav button:hover {{ background:rgba(255,255,255,.3); }}
   </style>
 </head>
 <body>
@@ -135,55 +176,129 @@ def main():
   <span class="cls" onclick="closeLb()">✕</span>
   <img id="lb-img" src="" alt="">
   <div class="meta" id="lb-meta"></div>
+  <div class="lb-nav">
+    <button onclick="lbMove(-1)">◀ 이전</button>
+    <button onclick="lbMove(1)">다음 ▶</button>
+  </div>
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const photos = {markers};
-function openLb(src, name, date) {{
-  document.getElementById('lb-img').src = src;
-  document.getElementById('lb-meta').textContent = name + (date ? '  ·  ' + date : '');
+const clusters = {clusters_json};
+const totalPhotos = clusters.reduce((s,c) => s+c.length, 0);
+
+let lbPhotos = [], lbIdx = 0;
+
+function openLb(photos, idx) {{
+  lbPhotos = photos; lbIdx = idx;
+  updateLb();
   document.getElementById('lb').classList.add('on');
+}}
+function updateLb() {{
+  const p = lbPhotos[lbIdx];
+  document.getElementById('lb-img').src = p.url;
+  document.getElementById('lb-meta').textContent =
+    p.name + (p.date ? '  ·  ' + p.date : '') + '  (' + (lbIdx+1) + '/' + lbPhotos.length + ')';
+}}
+function lbMove(dir) {{
+  lbIdx = (lbIdx + dir + lbPhotos.length) % lbPhotos.length;
+  updateLb();
 }}
 function closeLb() {{ document.getElementById('lb').classList.remove('on'); }}
 document.getElementById('lb').addEventListener('click', e => {{ if(e.target.id==='lb') closeLb(); }});
-document.addEventListener('keydown', e => {{ if(e.key==='Escape') closeLb(); }});
-if (!photos.length) {{
+document.addEventListener('keydown', e => {{
+  if(e.key==='Escape') closeLb();
+  if(e.key==='ArrowLeft') lbMove(-1);
+  if(e.key==='ArrowRight') lbMove(1);
+}});
+
+if (!clusters.length) {{
   document.getElementById('cnt').textContent = '사진 없음';
   document.getElementById('map').innerHTML =
-    '<p style="text-align:center;padding:80px;color:#555;font-size:.95rem">photos/ 폴더에 GPS 사진을 올려보세요!</p>';
+    '<p style="text-align:center;padding:80px;color:#555">photos/ 폴더에 GPS 사진을 올려보세요!</p>';
 }} else {{
-  document.getElementById('cnt').textContent = '📍 ' + photos.length + '장';
+  document.getElementById('cnt').textContent = '📍 ' + totalPhotos + '장 / ' + clusters.length + '곳';
+
   const map = L.map('map');
   L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
     attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     maxZoom: 19
   }}).addTo(map);
-  const icon = L.divIcon({{
-    className: '',
-    html: '<div style="width:14px;height:14px;background:#1D9E75;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
-    iconSize: [14,14], iconAnchor: [7,7]
-  }});
+
   const group = L.featureGroup();
-  photos.forEach(p => {{
-    const marker = L.marker([p.lat, p.lng], {{icon}}).addTo(map);
-    marker.bindPopup(`
-      <div class="pw">
+
+  clusters.forEach(photos => {{
+    const lat = photos.reduce((s,p)=>s+p.lat,0)/photos.length;
+    const lng = photos.reduce((s,p)=>s+p.lng,0)/photos.length;
+    const count = photos.length;
+    const size = count > 1 ? 36 : 14;
+
+    const icon = count > 1
+      ? L.divIcon({{
+          className: '',
+          html: `<div class="cluster-marker" style="width:${{size}}px;height:${{size}}px">${{count}}</div>`,
+          iconSize: [size, size], iconAnchor: [size/2, size/2]
+        }})
+      : L.divIcon({{
+          className: '',
+          html: '<div style="width:14px;height:14px;background:#1D9E75;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+          iconSize: [14,14], iconAnchor: [7,7]
+        }});
+
+    const marker = L.marker([lat, lng], {{icon}}).addTo(map);
+
+    const sliderId = 'sl' + Math.random().toString(36).slice(2);
+    const slides = photos.map((p,i) => `
+      <div class="slide ${{i===0?'active':''}}" id="${{sliderId}}_${{i}}">
         <img src="${{p.url}}" onerror="this.style.display='none'"
-             onclick="openLb('${{p.url}}','${{p.name}}','${{p.date}}')">
-        <div class="pname">${{p.name}}</div>
-        <div class="pdate">${{p.date || '날짜 정보 없음'}}</div>
-        <div class="pcoord">${{p.lat}}, ${{p.lng}}</div>
-      </div>`, {{maxWidth: 220}});
-    group.addLayer(marker);
+             onclick="openLb(${{JSON.stringify(photos).replace(/'/g,'&#39;')}},${{i}})">
+      </div>`).join('');
+
+    const popupHtml = `
+      <div class="popup-wrap">
+        <div class="slider-box">${{slides}}</div>
+        ${{photos.length > 1 ? `
+        <div class="nav">
+          <button onclick="slideMove('${{sliderId}}',-1,${{photos.length}})">◀</button>
+          <span class="counter" id="${{sliderId}}_cnt">1 / ${{photos.length}}</span>
+          <button onclick="slideMove('${{sliderId}}',1,${{photos.length}})">▶</button>
+        </div>` : ''}}
+        <div id="${{sliderId}}_info">
+          <div class="pname">${{photos[0].name}}</div>
+          <div class="pdate">${{photos[0].date || '날짜 없음'}}</div>
+          <div class="pcoord">${{photos[0].lat}}, ${{photos[0].lng}}</div>
+        </div>
+      </div>`;
+
+    marker.bindPopup(popupHtml, {{maxWidth:260}});
   }});
-  map.fitBounds(group.getBounds(), {{padding: [40,40]}});
+
+  function slideMove(id, dir, total) {{
+    const slides = document.querySelectorAll(`[id^="${{id}}_"]:not([id$="_cnt"]):not([id$="_info"])`);
+    let cur = 0;
+    slides.forEach((s,i) => {{ if(s.classList.contains('active')) cur = i; }});
+    slides[cur].classList.remove('active');
+    cur = (cur + dir + total) % total;
+    slides[cur].classList.add('active');
+    const cnt = document.getElementById(id+'_cnt');
+    if(cnt) cnt.textContent = (cur+1) + ' / ' + total;
+  }}
+  window.slideMove = slideMove;
+
+  map.fitBounds(group.getBounds ? group.getBounds() : [[35,126],[38,130]], {{padding:[40,40]}});
+  clusters.forEach(photos => {{
+    const lat = photos.reduce((s,p)=>s+p.lat,0)/photos.length;
+    const lng = photos.reduce((s,p)=>s+p.lng,0)/photos.length;
+    group.addLayer(L.marker([lat,lng]));
+  }});
+  map.addLayer(group);
+  if(clusters.length > 0) map.fitBounds(group.getBounds(), {{padding:[40,40]}});
 }}
 </script>
 </body>
 </html>"""
 
     OUTPUT_HTML.write_text(html, encoding='utf-8')
-    print(f"\\n✅ index.html 생성 완료 — {len(photos_data)}장")
+    print(f"\\n✅ index.html 생성 완료 — {len(photos_data)}장 / {len(clusters)}곳")
 
 if __name__ == "__main__":
     main()
