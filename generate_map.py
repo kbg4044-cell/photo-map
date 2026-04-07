@@ -87,7 +87,7 @@ def get_date(filepath):
         pass
     return ''
 
-def cluster_photos(photos, threshold=0.001):
+def cluster_photos(photos, threshold=0.001, same_group_only=False):
     clusters = []
     used = set()
     for i, p in enumerate(photos):
@@ -98,7 +98,8 @@ def cluster_photos(photos, threshold=0.001):
         for j, q in enumerate(photos):
             if j in used:
                 continue
-            if p['group'] == q['group'] and \
+            group_ok = (not same_group_only) or (p['group'] == q['group'])
+            if group_ok and \
                abs(p['lat']-q['lat']) < threshold and \
                abs(p['lng']-q['lng']) < threshold:
                 cluster.append(q)
@@ -110,13 +111,12 @@ def main():
     photos_data = []
     exts = {'.jpg', '.jpeg', '.JPG', '.JPEG'}
 
-    # 조별 폴더 탐색
     for group_dir in sorted(PHOTOS_DIR.iterdir()):
         if not group_dir.is_dir() or group_dir.name.startswith('.'):
             continue
         group_name = group_dir.name
         color = GROUP_COLORS.get(group_name, DEFAULT_COLOR)
-        print(f"\n[{group_name}] ({color})")
+        print(f"\n[{group_name}]")
         for f in sorted(group_dir.iterdir()):
             if f.suffix not in exts or f.name.startswith('.'):
                 continue
@@ -134,11 +134,16 @@ def main():
                 })
                 print(f"  ✅ {f.name} → {lat}, {lon}")
             else:
-                print(f"  ⚠️  {f.name} → GPS 없음, 스킵")
+                print(f"  ⚠️  {f.name} → GPS 없음")
 
-    clusters = cluster_photos(photos_data)
-    clusters_json = json.dumps(clusters, ensure_ascii=False)
-    total = len(photos_data)
+    # 전체 클러스터 (조 무관하게 같은 위치 묶기)
+    all_clusters = cluster_photos(photos_data, same_group_only=False)
+    # 조별 클러스터 (같은 조끼리만 묶기)
+    group_clusters = cluster_photos(photos_data, same_group_only=True)
+
+    all_json   = json.dumps(all_clusters, ensure_ascii=False)
+    group_json = json.dumps(group_clusters, ensure_ascii=False)
+    total      = len(photos_data)
     groups_json = json.dumps(GROUP_COLORS, ensure_ascii=False)
 
     html = f"""<!DOCTYPE html>
@@ -146,26 +151,27 @@ def main():
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>나의 포토맵</title>
+  <title>조별 포토맵</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <style>
     *{{margin:0;padding:0;box-sizing:border-box}}
     body{{font-family:'Malgun Gothic',sans-serif;background:#0f0f1a;color:#fff;height:100vh;display:flex;flex-direction:column}}
-    header{{padding:10px 16px;background:rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;flex-wrap:wrap;gap:8px}}
+    header{{padding:10px 16px;background:rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}}
     header h1{{font-size:1rem;font-weight:500}}
     .badge{{background:rgba(255,255,255,.1);padding:3px 10px;border-radius:20px;font-size:.78rem;color:#ccc}}
     #filters{{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px;background:rgba(255,255,255,.03);border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}}
-    .fbtn{{border:none;padding:5px 14px;border-radius:20px;cursor:pointer;font-size:.78rem;font-weight:500;opacity:.5;transition:.15s}}
-    .fbtn.on{{opacity:1;color:#fff}}
-    .fbtn.all{{background:rgba(255,255,255,.15);color:#fff;opacity:1}}
+    .fbtn{{border:none;padding:5px 14px;border-radius:20px;cursor:pointer;font-size:.78rem;font-weight:600;opacity:.4;transition:.15s;color:#fff}}
+    .fbtn.on{{opacity:1}}
+    .fbtn.all{{background:rgba(255,255,255,.2);color:#fff;opacity:1}}
+    .fbtn.all.on{{background:rgba(255,255,255,.35)}}
     #map{{flex:1}}
-    .cm{{border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;color:#fff}}
+    .cm{{border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;color:#fff}}
     .leaflet-popup-content{{margin:10px 12px}}
-    .pw{{width:220px}}
+    .pw{{width:230px}}
     .ptag{{display:inline-block;font-size:11px;padding:2px 10px;border-radius:10px;color:#fff;margin-bottom:6px;font-weight:600}}
-    .ph-wrap img{{width:100%;height:150px;object-fit:cover;display:block;cursor:zoom-in;border-radius:8px}}
+    .ph-wrap img{{width:100%;height:155px;object-fit:cover;display:block;cursor:zoom-in;border-radius:8px}}
     .ph-nav{{display:flex;align-items:center;justify-content:space-between;padding:5px 0 2px}}
-    .ph-btn{{border:none;color:#fff;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:14px;font-weight:600}}
+    .ph-btn{{border:none;color:#fff;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:14px;font-weight:700}}
     .ph-cnt{{font-size:12px;color:#666}}
     .pname{{font-size:.78rem;font-weight:600;color:#222;margin:4px 0 2px;word-break:break-all}}
     .pdate{{font-size:.73rem;color:#666}}
@@ -198,13 +204,21 @@ def main():
 </div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const clusters = {clusters_json};
+const allClusters   = {all_json};
+const groupClusters = {group_json};
 const total = {total};
 const GROUP_COLORS = {groups_json};
 const groups = Object.keys(GROUP_COLORS);
+
 let lbList=[], lbIdx=0;
 let activeGroup='all';
-let allMarkers=[];
+let markerLayers=[];
+const map=L.map('map');
+
+L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{
+  attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom:19
+}}).addTo(map);
 
 function openLb(list,idx){{
   lbList=list; lbIdx=idx; updateLb();
@@ -225,23 +239,40 @@ document.addEventListener('keydown',e=>{{
   if(e.key==='ArrowRight')lbMove(1);
 }});
 
-function updateCount(){{
-  const visible=allMarkers.filter(m=>activeGroup==='all'||m.group===activeGroup);
-  const pc=visible.reduce((s,m)=>s+m.photoCount,0);
-  document.getElementById('cnt').textContent='📍 '+pc+'장 / '+visible.length+'곳'+(activeGroup!=='all'?' ['+activeGroup+']':'');
+function makePopup(photos, idx, pid){{
+  const p=photos[idx];
+  const pj=JSON.stringify(photos);
+  const n=photos.length;
+  const color=p.color;
+
+  const tags=[...new Set(photos.map(x=>x.group))].map(g=>
+    `<span class="ptag" style="background:${{GROUP_COLORS[g]||'#888'}}">${{g}}</span>`
+  ).join(' ');
+
+  let nav='';
+  if(n>1){{
+    nav=`<div class="ph-nav">
+      <button class="ph-btn" style="background:${{color}}" onclick="window.${{pid}}(-1)">◀</button>
+      <span class="ph-cnt">${{idx+1}} / ${{n}}</span>
+      <button class="ph-btn" style="background:${{color}}" onclick="window.${{pid}}(1)">▶</button>
+    </div>`;
+  }}
+  return `<div class="pw">
+    <div style="margin-bottom:4px">${{tags}}</div>
+    <div class="ph-wrap">
+      <img src="${{p.url}}" onerror="this.style.display='none'"
+           onclick='openLb(${{pj}},${{idx}})'>
+    </div>
+    ${{nav}}
+    <div class="pname">${{p.name}}</div>
+    <div class="pdate">${{p.date||'날짜 없음'}}</div>
+    <div class="pcoord">${{p.lat}}, ${{p.lng}}</div>
+  </div>`;
 }}
 
-if(!clusters.length){{
-  document.getElementById('cnt').textContent='사진 없음';
-  document.getElementById('map').innerHTML='<p style="text-align:center;padding:80px;color:#555">조별 폴더에 GPS 사진을 올려보세요!</p>';
-  document.getElementById('filters').style.display='none';
-}}else{{
-  const map=L.map('map');
-  L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{
-    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    maxZoom:19
-  }}).addTo(map);
-
+function renderMarkers(clusters){{
+  markerLayers.forEach(m=>map.removeLayer(m));
+  markerLayers=[];
   const bounds=[];
 
   clusters.forEach((photos,ci)=>{{
@@ -249,7 +280,6 @@ if(!clusters.length){{
     const lng=photos.reduce((s,p)=>s+p.lng,0)/photos.length;
     const n=photos.length;
     const color=photos[0].color;
-    const group=photos[0].group;
     const sz=n>1?38:14;
 
     const icon=L.divIcon({{
@@ -261,82 +291,69 @@ if(!clusters.length){{
     }});
 
     const marker=L.marker([lat,lng],{{icon}}).addTo(map);
+    markerLayers.push(marker);
     bounds.push([lat,lng]);
-    allMarkers.push({{marker,group,photoCount:n}});
 
     let cur=0;
-    const pid='fn'+ci;
-
-    function makePopup(idx){{
-      const p=photos[idx];
-      const pj=JSON.stringify(photos);
-      let nav='';
-      if(n>1){{
-        nav=`<div class="ph-nav">
-          <button class="ph-btn" style="background:${{color}}" onclick="window.${{pid}}(-1)">◀</button>
-          <span class="ph-cnt">${{idx+1}} / ${{n}}</span>
-          <button class="ph-btn" style="background:${{color}}" onclick="window.${{pid}}(1)">▶</button>
-        </div>`;
-      }}
-      return `<div class="pw">
-        <span class="ptag" style="background:${{color}}">${{group}}</span>
-        <div class="ph-wrap">
-          <img src="${{p.url}}" onerror="this.style.display='none'"
-               onclick='openLb(${{pj}},${{idx}})'>
-        </div>
-        ${{nav}}
-        <div class="pname">${{p.name}}</div>
-        <div class="pdate">${{p.date||'날짜 없음'}}</div>
-        <div class="pcoord">${{p.lat}}, ${{p.lng}}</div>
-      </div>`;
-    }}
-
+    const pid='fn'+ci+'_'+Date.now();
     window[pid]=function(d){{
       cur=(cur+d+n)%n;
-      marker.getPopup().setContent(makePopup(cur));
+      marker.getPopup().setContent(makePopup(photos,cur,pid));
     }};
-    marker.bindPopup(makePopup(0),{{maxWidth:260}});
+    marker.bindPopup(makePopup(photos,0,pid),{{maxWidth:270}});
   }});
 
   if(bounds.length===1) map.setView(bounds[0],15);
-  else map.fitBounds(bounds,{{padding:[40,40]}});
+  else if(bounds.length>1) map.fitBounds(bounds,{{padding:[40,40]}});
 
-  updateCount();
+  const pc=clusters.reduce((s,c)=>s+c.length,0);
+  document.getElementById('cnt').textContent='📍 '+pc+'장 / '+clusters.length+'곳'+(activeGroup!=='all'?' ['+activeGroup+']':'');
+}}
 
-  const filtersEl=document.getElementById('filters');
-  const allBtn=document.createElement('button');
-  allBtn.className='fbtn all'; allBtn.textContent='전체';
-  allBtn.onclick=()=>setFilter('all');
-  filtersEl.appendChild(allBtn);
-
-  groups.forEach(g=>{{
-    const c=GROUP_COLORS[g];
-    const btn=document.createElement('button');
-    btn.className='fbtn on';
-    btn.style.background=c;
-    btn.textContent=g;
-    btn.onclick=()=>setFilter(g);
-    filtersEl.appendChild(btn);
-  }});
-
-  function setFilter(g){{
-    activeGroup=g;
-    allMarkers.forEach(m=>{{
-      if(g==='all'||m.group===g) map.addLayer(m.marker);
-      else map.removeLayer(m.marker);
-    }});
-    document.querySelectorAll('.fbtn').forEach(b=>{{
-      b.classList.toggle('on', b.textContent===g||(g==='all'&&b.textContent==='전체'));
-    }});
-    updateCount();
+function setFilter(g){{
+  activeGroup=g;
+  if(g==='all'){{
+    renderMarkers(allClusters);
+  }}else{{
+    const filtered=groupClusters.filter(c=>c[0].group===g);
+    renderMarkers(filtered);
   }}
+  document.querySelectorAll('.fbtn').forEach(b=>{{
+    b.classList.toggle('on', b.dataset.g===g);
+  }});
+}}
+
+const filtersEl=document.getElementById('filters');
+const allBtn=document.createElement('button');
+allBtn.className='fbtn all on';
+allBtn.textContent='전체';
+allBtn.dataset.g='all';
+allBtn.onclick=()=>setFilter('all');
+filtersEl.appendChild(allBtn);
+
+groups.forEach(g=>{{
+  const btn=document.createElement('button');
+  btn.className='fbtn';
+  btn.style.background=GROUP_COLORS[g];
+  btn.textContent=g;
+  btn.dataset.g=g;
+  btn.onclick=()=>setFilter(g);
+  filtersEl.appendChild(btn);
+}});
+
+if(allClusters.length){{
+  renderMarkers(allClusters);
+}}else{{
+  document.getElementById('cnt').textContent='사진 없음';
+  document.getElementById('map').innerHTML='<p style="text-align:center;padding:80px;color:#555">조별 폴더에 GPS 사진을 올려보세요!</p>';
+  document.getElementById('filters').style.display='none';
 }}
 </script>
 </body>
 </html>"""
 
     OUTPUT_HTML.write_text(html, encoding='utf-8')
-    print(f"\n✅ 완료 — {len(photos_data)}장 / {len(clusters)}곳")
+    print(f"\n✅ 완료 — {len(photos_data)}장 / 전체{len(all_clusters)}곳 / 조별{len(group_clusters)}곳")
 
 if __name__ == "__main__":
     main()
