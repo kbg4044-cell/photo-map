@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'photos/**'
+  workflow_dispatch:
 
 jobs:
   build:
