@@ -1,0 +1,189 @@
+import os, json, struct
+from pathlib import Path
+
+PHOTOS_DIR  = Path("photos")
+OUTPUT_HTML = Path("index.html")
+
+def extract_gps(filepath):
+    try:
+        with open(filepath, 'rb') as f:
+            data = f.read()
+        i = 2
+        while i < len(data) - 1:
+            if data[i] != 0xFF:
+                break
+            marker = data[i+1]
+            length = struct.unpack('>H', data[i+2:i+4])[0]
+            if marker == 0xE1:
+                seg = data[i+4:i+2+length]
+                if seg[:4] == b'Exif':
+                    return parse_gps(seg[6:])
+            i += 2 + length
+    except:
+        pass
+    return None
+
+def parse_gps(tiff):
+    try:
+        bo = '<' if tiff[:2] == b'II' else '>'
+        def r16(o): return struct.unpack_from(bo+'H', tiff, o)[0]
+        def r32(o): return struct.unpack_from(bo+'I', tiff, o)[0]
+        def rat(o):
+            n = r32(o); d = r32(o+4)
+            return n/d if d else 0
+        ifd0 = r32(4)
+        gps_off = None
+        for i in range(r16(ifd0)):
+            base = ifd0 + 2 + i*12
+            if r16(base) == 0x8825:
+                gps_off = r32(base+8)
+                break
+        if not gps_off:
+            return None
+        gps = {}
+        for i in range(r16(gps_off)):
+            base = gps_off + 2 + i*12
+            tag = r16(base)
+            typ = r16(base+2)
+            cnt = r32(base+4)
+            vo  = base+8
+            if typ == 5:
+                off = r32(vo)
+                gps[tag] = [rat(off + j*8) for j in range(cnt)]
+            elif typ == 2:
+                off = r32(vo) if cnt > 4 else vo
+                gps[tag] = tiff[off:off+cnt].rstrip(b'\x00').decode('ascii', errors='ignore')
+        if 2 not in gps or 4 not in gps:
+            return None
+        def deg(v): return v[0] + v[1]/60 + v[2]/3600
+        lat = deg(gps[2]); lon = deg(gps[4])
+        if gps.get(1) == 'S': lat = -lat
+        if gps.get(3) == 'W': lon = -lon
+        return round(lat,6), round(lon,6)
+    except:
+        return None
+
+def get_date(filepath):
+    try:
+        with open(filepath, 'rb') as f:
+            data = f.read(65536)
+        idx = data.find(b'DateTimeOriginal\x00')
+        if idx > 0:
+            raw = data[idx+17:idx+37]
+            s = raw.split(b'\x00')[0].decode('ascii', errors='ignore')
+            if len(s) >= 10:
+                return s[:10].replace(':', '-')
+    except:
+        pass
+    return ''
+
+def main():
+    photos_data = []
+    exts = {'.jpg', '.jpeg', '.JPG', '.JPEG'}
+    for f in sorted(PHOTOS_DIR.iterdir()):
+        if f.suffix not in exts or f.name.startswith('.'):
+            continue
+        gps = extract_gps(f)
+        if gps:
+            lat, lon = gps
+            photos_data.append({
+                "name": f.name,
+                "lat":  lat,
+                "lng":  lon,
+                "url":  f"photos/{f.name}",
+                "date": get_date(f)
+            })
+            print(f"  ✅ {f.name} → {lat}, {lon}")
+        else:
+            print(f"  ⚠️  {f.name} → GPS 없음, 스킵")
+
+    markers = json.dumps(photos_data, ensure_ascii=False)
+
+    html = f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>나의 포토맵</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    * {{ margin:0; padding:0; box-sizing:border-box; }}
+    body {{ font-family:'Malgun Gothic',sans-serif; background:#0f0f1a; color:#fff; height:100vh; display:flex; flex-direction:column; }}
+    header {{ padding:12px 20px; background:rgba(255,255,255,.06); border-bottom:1px solid rgba(255,255,255,.1); display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }}
+    header h1 {{ font-size:1.1rem; font-weight:500; }}
+    .badge {{ background:rgba(29,158,117,.25); border:1px solid #1D9E75; color:#5DCAA5; padding:3px 12px; border-radius:20px; font-size:.8rem; }}
+    #map {{ flex:1; }}
+    #lb {{ display:none; position:absolute; inset:0; background:rgba(0,0,0,.88); z-index:9999; flex-direction:column; align-items:center; justify-content:center; gap:14px; }}
+    #lb.on {{ display:flex; }}
+    #lb img {{ max-width:90vw; max-height:75vh; border-radius:10px; }}
+    #lb .meta {{ background:rgba(255,255,255,.12); padding:8px 20px; border-radius:20px; font-size:.85rem; }}
+    #lb .cls {{ position:absolute; top:16px; right:20px; font-size:1.6rem; cursor:pointer; opacity:.7; line-height:1; }}
+    .pw {{ font-family:'Malgun Gothic',sans-serif; min-width:190px; }}
+    .pw img {{ width:100%; height:145px; object-fit:cover; border-radius:7px; cursor:zoom-in; display:block; }}
+    .pw .pname {{ font-size:.82rem; font-weight:500; margin:7px 0 2px; color:#222; word-break:break-all; }}
+    .pw .pdate {{ font-size:.75rem; color:#1D9E75; }}
+    .pw .pcoord {{ font-size:.72rem; color:#888; margin-top:2px; }}
+  </style>
+</head>
+<body>
+<header>
+  <h1>📸 나의 포토맵</h1>
+  <span class="badge" id="cnt">불러오는 중...</span>
+</header>
+<div id="map"></div>
+<div id="lb">
+  <span class="cls" onclick="closeLb()">✕</span>
+  <img id="lb-img" src="" alt="">
+  <div class="meta" id="lb-meta"></div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const photos = {markers};
+function openLb(src, name, date) {{
+  document.getElementById('lb-img').src = src;
+  document.getElementById('lb-meta').textContent = name + (date ? '  ·  ' + date : '');
+  document.getElementById('lb').classList.add('on');
+}}
+function closeLb() {{ document.getElementById('lb').classList.remove('on'); }}
+document.getElementById('lb').addEventListener('click', e => {{ if(e.target.id==='lb') closeLb(); }});
+document.addEventListener('keydown', e => {{ if(e.key==='Escape') closeLb(); }});
+if (!photos.length) {{
+  document.getElementById('cnt').textContent = '사진 없음';
+  document.getElementById('map').innerHTML =
+    '<p style="text-align:center;padding:80px;color:#555;font-size:.95rem">photos/ 폴더에 GPS 사진을 올려보세요!</p>';
+}} else {{
+  document.getElementById('cnt').textContent = '📍 ' + photos.length + '장';
+  const map = L.map('map');
+  L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19
+  }}).addTo(map);
+  const icon = L.divIcon({{
+    className: '',
+    html: '<div style="width:14px;height:14px;background:#1D9E75;border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>',
+    iconSize: [14,14], iconAnchor: [7,7]
+  }});
+  const group = L.featureGroup();
+  photos.forEach(p => {{
+    const marker = L.marker([p.lat, p.lng], {{icon}}).addTo(map);
+    marker.bindPopup(`
+      <div class="pw">
+        <img src="${{p.url}}" onerror="this.style.display='none'"
+             onclick="openLb('${{p.url}}','${{p.name}}','${{p.date}}')">
+        <div class="pname">${{p.name}}</div>
+        <div class="pdate">${{p.date || '날짜 정보 없음'}}</div>
+        <div class="pcoord">${{p.lat}}, ${{p.lng}}</div>
+      </div>`, {{maxWidth: 220}});
+    group.addLayer(marker);
+  }});
+  map.fitBounds(group.getBounds(), {{padding: [40,40]}});
+}}
+</script>
+</body>
+</html>"""
+
+    OUTPUT_HTML.write_text(html, encoding='utf-8')
+    print(f"\\n✅ index.html 생성 완료 — {len(photos_data)}장")
+
+if __name__ == "__main__":
+    main()
