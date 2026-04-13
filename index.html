@@ -15,9 +15,47 @@
     .fbtn{border:none;padding:5px 14px;border-radius:20px;cursor:pointer;font-size:.78rem;font-weight:600;opacity:.4;transition:.15s;color:#fff}
     .fbtn.on{opacity:1}
     .fbtn.all{background:rgba(255,255,255,.2);color:#fff;opacity:1}
-    .fbtn.all.on{background:rgba(255,255,255,.35)}
     #map{flex:1}
-    .cm{border:2.5px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.5);cursor:pointer;color:#fff}
+
+    /* 사진 마커 (항상 표시) */
+    .photo-marker{
+      cursor:pointer;
+      filter:drop-shadow(0 3px 8px rgba(0,0,0,.5));
+      transition:transform .15s;
+    }
+    .photo-marker:hover{transform:scale(1.08)}
+    .photo-marker-inner{
+      width:80px;
+      background:#fff;
+      border-radius:8px;
+      overflow:hidden;
+      border:3px solid #fff;
+      position:relative;
+    }
+    .photo-marker-inner img{
+      width:80px;height:60px;
+      object-fit:cover;display:block;
+    }
+    .photo-marker-badge{
+      position:absolute;top:3px;right:3px;
+      background:rgba(0,0,0,.7);color:#fff;
+      font-size:10px;font-weight:700;
+      padding:1px 5px;border-radius:8px;
+    }
+    .photo-marker-tag{
+      font-size:10px;font-weight:700;color:#fff;
+      text-align:center;padding:2px 4px;
+    }
+    /* 말풍선 꼬리 */
+    .photo-marker-tail{
+      width:0;height:0;
+      border-left:8px solid transparent;
+      border-right:8px solid transparent;
+      border-top:10px solid #fff;
+      margin:0 auto;
+    }
+
+    /* 상세 팝업 */
     .leaflet-popup-content{margin:10px 12px}
     .pw{width:230px}
     .ptag{display:inline-block;font-size:11px;padding:2px 10px;border-radius:10px;color:#fff;margin-bottom:6px;font-weight:600}
@@ -28,6 +66,8 @@
     .pname{font-size:.78rem;font-weight:600;color:#222;margin:4px 0 2px;word-break:break-all}
     .pdate{font-size:.73rem;color:#666}
     .pcoord{font-size:.7rem;color:#999;margin-top:1px}
+
+    /* 라이트박스 */
     #lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:99999;flex-direction:column;align-items:center;justify-content:center;gap:14px}
     #lb.on{display:flex}
     #lb img{max-width:92vw;max-height:74vh;border-radius:10px}
@@ -45,6 +85,7 @@
 </header>
 <div id="filters"></div>
 <div id="map"></div>
+
 <div id="lb">
   <span class="lcls" onclick="closeLb()">✕</span>
   <img id="lb-img" src="" alt="">
@@ -54,10 +95,11 @@
     <button onclick="lbMove(1)">다음 ▶</button>
   </div>
 </div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const allClusters   = [[{"name": "20260329_124944 - 김보근.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/A조/20260329_124944 - 김보근.jpg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "20260329_124945.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/A조/20260329_124945.jpg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "20260329_124944.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/B조/20260329_124944.jpg", "date": "", "group": "B조", "color": "#EF9F27"}, {"name": "1774490980582.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/C조/1774490980582.jpg", "date": "", "group": "C조", "color": "#1D9E75"}], [{"name": "IMG_0284 - 박소정.jpeg", "lat": 35.157669, "lng": 129.120072, "url": "photos/A조/IMG_0284 - 박소정.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "IMG_0336 - 박소정.jpeg", "lat": 35.157842, "lng": 129.120256, "url": "photos/A조/IMG_0336 - 박소정.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_0305 - 박소정.jpeg", "lat": 35.140506, "lng": 129.116333, "url": "photos/A조/IMG_0305 - 박소정.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "IMG_0315 - 박소정.jpeg", "lat": 35.142617, "lng": 129.116347, "url": "photos/A조/IMG_0315 - 박소정.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_1918 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916664, "url": "photos/A조/IMG_1918 - sinbali1.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "IMG_1919 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916656, "url": "photos/A조/IMG_1919 - sinbali1.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "IMG_1920 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916656, "url": "photos/A조/IMG_1920 - sinbali1.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_1947 - sinbali1.jpeg", "lat": 35.096461, "lng": 129.042222, "url": "photos/A조/IMG_1947 - sinbali1.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_1757 - diya.jpeg", "lat": 35.153736, "lng": 129.059967, "url": "photos/F조/IMG_1757 - diya.jpeg", "date": "", "group": "F조", "color": "#D4537E"}], [{"name": "IMG_1786 - diya.jpeg", "lat": 37.581294, "lng": 126.966719, "url": "photos/F조/IMG_1786 - diya.jpeg", "date": "", "group": "F조", "color": "#D4537E"}], [{"name": "IMG_1865 - diya.jpeg", "lat": 37.580906, "lng": 126.984528, "url": "photos/F조/IMG_1865 - diya.jpeg", "date": "", "group": "F조", "color": "#D4537E"}]];
-const groupClusters = [[{"name": "20260329_124944 - 김보근.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/A조/20260329_124944 - 김보근.jpg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "20260329_124945.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/A조/20260329_124945.jpg", "date": "", "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_0284 - 박소정.jpeg", "lat": 35.157669, "lng": 129.120072, "url": "photos/A조/IMG_0284 - 박소정.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "IMG_0336 - 박소정.jpeg", "lat": 35.157842, "lng": 129.120256, "url": "photos/A조/IMG_0336 - 박소정.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_0305 - 박소정.jpeg", "lat": 35.140506, "lng": 129.116333, "url": "photos/A조/IMG_0305 - 박소정.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "IMG_0315 - 박소정.jpeg", "lat": 35.142617, "lng": 129.116347, "url": "photos/A조/IMG_0315 - 박소정.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_1918 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916664, "url": "photos/A조/IMG_1918 - sinbali1.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "IMG_1919 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916656, "url": "photos/A조/IMG_1919 - sinbali1.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}, {"name": "IMG_1920 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916656, "url": "photos/A조/IMG_1920 - sinbali1.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_1947 - sinbali1.jpeg", "lat": 35.096461, "lng": 129.042222, "url": "photos/A조/IMG_1947 - sinbali1.jpeg", "date": "", "group": "A조", "color": "#E24B4A"}], [{"name": "20260329_124944.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/B조/20260329_124944.jpg", "date": "", "group": "B조", "color": "#EF9F27"}], [{"name": "1774490980582.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/C조/1774490980582.jpg", "date": "", "group": "C조", "color": "#1D9E75"}], [{"name": "IMG_1757 - diya.jpeg", "lat": 35.153736, "lng": 129.059967, "url": "photos/F조/IMG_1757 - diya.jpeg", "date": "", "group": "F조", "color": "#D4537E"}], [{"name": "IMG_1786 - diya.jpeg", "lat": 37.581294, "lng": 126.966719, "url": "photos/F조/IMG_1786 - diya.jpeg", "date": "", "group": "F조", "color": "#D4537E"}], [{"name": "IMG_1865 - diya.jpeg", "lat": 37.580906, "lng": 126.984528, "url": "photos/F조/IMG_1865 - diya.jpeg", "date": "", "group": "F조", "color": "#D4537E"}]];
+const allClusters   = [[{"name": "IMG_1865 - diya.jpeg", "lat": 37.580906, "lng": 126.984528, "url": "photos/F조/IMG_1865 - diya.jpeg", "date": "", "mtime": 1776046654.613309, "group": "F조", "color": "#D4537E"}], [{"name": "IMG_1786 - diya.jpeg", "lat": 37.581294, "lng": 126.966719, "url": "photos/F조/IMG_1786 - diya.jpeg", "date": "", "mtime": 1776046654.600309, "group": "F조", "color": "#D4537E"}], [{"name": "IMG_1757 - diya.jpeg", "lat": 35.153736, "lng": 129.059967, "url": "photos/F조/IMG_1757 - diya.jpeg", "date": "", "mtime": 1776046654.5883088, "group": "F조", "color": "#D4537E"}], [{"name": "1774490980582.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/C조/1774490980582.jpg", "date": "", "mtime": 1776046654.5765827, "group": "C조", "color": "#1D9E75"}, {"name": "20260329_124944.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/B조/20260329_124944.jpg", "date": "", "mtime": 1776046654.575309, "group": "B조", "color": "#EF9F27"}, {"name": "20260329_124945.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/A조/20260329_124945.jpg", "date": "", "mtime": 1776046654.5033092, "group": "A조", "color": "#E24B4A"}, {"name": "20260329_124944 - 김보근.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/A조/20260329_124944 - 김보근.jpg", "date": "", "mtime": 1776046654.492309, "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_1947 - sinbali1.jpeg", "lat": 35.096461, "lng": 129.042222, "url": "photos/A조/IMG_1947 - sinbali1.jpeg", "date": "", "mtime": 1776046654.564309, "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_1920 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916656, "url": "photos/A조/IMG_1920 - sinbali1.jpeg", "date": "", "mtime": 1776046654.555309, "group": "A조", "color": "#E24B4A"}, {"name": "IMG_1919 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916656, "url": "photos/A조/IMG_1919 - sinbali1.jpeg", "date": "", "mtime": 1776046654.552309, "group": "A조", "color": "#E24B4A"}, {"name": "IMG_1918 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916664, "url": "photos/A조/IMG_1918 - sinbali1.jpeg", "date": "", "mtime": 1776046654.5443091, "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_0336 - 박소정.jpeg", "lat": 35.157842, "lng": 129.120256, "url": "photos/A조/IMG_0336 - 박소정.jpeg", "date": "", "mtime": 1776046654.539309, "group": "A조", "color": "#E24B4A"}, {"name": "IMG_0284 - 박소정.jpeg", "lat": 35.157669, "lng": 129.120072, "url": "photos/A조/IMG_0284 - 박소정.jpeg", "date": "", "mtime": 1776046654.5083091, "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_0315 - 박소정.jpeg", "lat": 35.142617, "lng": 129.116347, "url": "photos/A조/IMG_0315 - 박소정.jpeg", "date": "", "mtime": 1776046654.5343091, "group": "A조", "color": "#E24B4A"}, {"name": "IMG_0305 - 박소정.jpeg", "lat": 35.140506, "lng": 129.116333, "url": "photos/A조/IMG_0305 - 박소정.jpeg", "date": "", "mtime": 1776046654.526309, "group": "A조", "color": "#E24B4A"}]];
+const groupClusters = [[{"name": "IMG_1865 - diya.jpeg", "lat": 37.580906, "lng": 126.984528, "url": "photos/F조/IMG_1865 - diya.jpeg", "date": "", "mtime": 1776046654.613309, "group": "F조", "color": "#D4537E"}], [{"name": "IMG_1786 - diya.jpeg", "lat": 37.581294, "lng": 126.966719, "url": "photos/F조/IMG_1786 - diya.jpeg", "date": "", "mtime": 1776046654.600309, "group": "F조", "color": "#D4537E"}], [{"name": "IMG_1757 - diya.jpeg", "lat": 35.153736, "lng": 129.059967, "url": "photos/F조/IMG_1757 - diya.jpeg", "date": "", "mtime": 1776046654.5883088, "group": "F조", "color": "#D4537E"}], [{"name": "1774490980582.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/C조/1774490980582.jpg", "date": "", "mtime": 1776046654.5765827, "group": "C조", "color": "#1D9E75"}], [{"name": "20260329_124944.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/B조/20260329_124944.jpg", "date": "", "mtime": 1776046654.575309, "group": "B조", "color": "#EF9F27"}], [{"name": "IMG_1947 - sinbali1.jpeg", "lat": 35.096461, "lng": 129.042222, "url": "photos/A조/IMG_1947 - sinbali1.jpeg", "date": "", "mtime": 1776046654.564309, "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_1920 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916656, "url": "photos/A조/IMG_1920 - sinbali1.jpeg", "date": "", "mtime": 1776046654.555309, "group": "A조", "color": "#E24B4A"}, {"name": "IMG_1919 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916656, "url": "photos/A조/IMG_1919 - sinbali1.jpeg", "date": "", "mtime": 1776046654.552309, "group": "A조", "color": "#E24B4A"}, {"name": "IMG_1918 - sinbali1.jpeg", "lat": 37.556494, "lng": 126.916664, "url": "photos/A조/IMG_1918 - sinbali1.jpeg", "date": "", "mtime": 1776046654.5443091, "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_0336 - 박소정.jpeg", "lat": 35.157842, "lng": 129.120256, "url": "photos/A조/IMG_0336 - 박소정.jpeg", "date": "", "mtime": 1776046654.539309, "group": "A조", "color": "#E24B4A"}, {"name": "IMG_0284 - 박소정.jpeg", "lat": 35.157669, "lng": 129.120072, "url": "photos/A조/IMG_0284 - 박소정.jpeg", "date": "", "mtime": 1776046654.5083091, "group": "A조", "color": "#E24B4A"}], [{"name": "IMG_0315 - 박소정.jpeg", "lat": 35.142617, "lng": 129.116347, "url": "photos/A조/IMG_0315 - 박소정.jpeg", "date": "", "mtime": 1776046654.5343091, "group": "A조", "color": "#E24B4A"}, {"name": "IMG_0305 - 박소정.jpeg", "lat": 35.140506, "lng": 129.116333, "url": "photos/A조/IMG_0305 - 박소정.jpeg", "date": "", "mtime": 1776046654.526309, "group": "A조", "color": "#E24B4A"}], [{"name": "20260329_124945.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/A조/20260329_124945.jpg", "date": "", "mtime": 1776046654.5033092, "group": "A조", "color": "#E24B4A"}, {"name": "20260329_124944 - 김보근.jpg", "lat": 35.233911, "lng": 128.884517, "url": "photos/A조/20260329_124944 - 김보근.jpg", "date": "", "mtime": 1776046654.492309, "group": "A조", "color": "#E24B4A"}]];
 const total = 15;
 const GROUP_COLORS = {"A조": "#E24B4A", "B조": "#EF9F27", "C조": "#1D9E75", "D조": "#378ADD", "E조": "#7F77DD", "F조": "#D4537E"};
 const groups = Object.keys(GROUP_COLORS);
@@ -65,8 +107,8 @@ const groups = Object.keys(GROUP_COLORS);
 let lbList=[], lbIdx=0;
 let activeGroup='all';
 let markerLayers=[];
-const map=L.map('map');
 
+const map=L.map('map');
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
   attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   maxZoom:19
@@ -91,16 +133,14 @@ document.addEventListener('keydown',e=>{
   if(e.key==='ArrowRight')lbMove(1);
 });
 
-function makePopup(photos, idx, pid){
+function makePopupContent(photos, idx, pid){
   const p=photos[idx];
   const pj=JSON.stringify(photos);
   const n=photos.length;
   const color=p.color;
-
   const tags=[...new Set(photos.map(x=>x.group))].map(g=>
     `<span class="ptag" style="background:${GROUP_COLORS[g]||'#888'}">${g}</span>`
   ).join(' ');
-
   let nav='';
   if(n>1){
     nav=`<div class="ph-nav">
@@ -122,6 +162,31 @@ function makePopup(photos, idx, pid){
   </div>`;
 }
 
+function makePhotoIcon(photos){
+  const p = photos[0];
+  const n = photos.length;
+  const color = p.color;
+  const badge = n > 1 ? `<div class="photo-marker-badge">${n}</div>` : '';
+  const html = `
+    <div class="photo-marker">
+      <div class="photo-marker-inner" style="border-color:${color}">
+        <img src="${p.url}" onerror="this.src=''">
+        ${badge}
+      </div>
+      <div class="photo-marker-tail" style="border-top-color:${color}"></div>
+      <div class="photo-marker-tag" style="background:${color};border-radius:0 0 6px 6px;margin-top:-1px">
+        ${[...new Set(photos.map(x=>x.group))].join(' · ')}
+      </div>
+    </div>`;
+  return L.divIcon({
+    className: '',
+    html: html,
+    iconSize: [86, 90],
+    iconAnchor: [43, 90],
+    popupAnchor: [0, -92]
+  });
+}
+
 function renderMarkers(clusters){
   markerLayers.forEach(m=>map.removeLayer(m));
   markerLayers=[];
@@ -130,33 +195,23 @@ function renderMarkers(clusters){
   clusters.forEach((photos,ci)=>{
     const lat=photos.reduce((s,p)=>s+p.lat,0)/photos.length;
     const lng=photos.reduce((s,p)=>s+p.lng,0)/photos.length;
-    const n=photos.length;
-    const color=photos[0].color;
-    const sz=n>1?38:14;
 
-    const icon=L.divIcon({
-      className:'',
-      html:n>1
-        ?`<div class="cm" style="width:${sz}px;height:${sz}px;background:${color}">${n}</div>`
-        :`<div style="width:14px;height:14px;background:${color};border:2.5px solid #fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.5)"></div>`,
-      iconSize:[sz,sz],iconAnchor:[sz/2,sz/2]
-    });
-
-    const marker=L.marker([lat,lng],{icon}).addTo(map);
+    const icon = makePhotoIcon(photos);
+    const marker = L.marker([lat,lng],{icon}).addTo(map);
     markerLayers.push(marker);
     bounds.push([lat,lng]);
 
     let cur=0;
-    const pid='fn'+ci+'_'+Date.now();
+    const pid='fn'+ci+'_'+Math.random().toString(36).slice(2);
     window[pid]=function(d){
-      cur=(cur+d+n)%n;
-      marker.getPopup().setContent(makePopup(photos,cur,pid));
+      cur=(cur+d+photos.length)%photos.length;
+      marker.getPopup().setContent(makePopupContent(photos,cur,pid));
     };
-    marker.bindPopup(makePopup(photos,0,pid),{maxWidth:270});
+    marker.bindPopup(makePopupContent(photos,0,pid),{maxWidth:270});
   });
 
   if(bounds.length===1) map.setView(bounds[0],15);
-  else if(bounds.length>1) map.fitBounds(bounds,{padding:[40,40]});
+  else if(bounds.length>1) map.fitBounds(bounds,{padding:[80,80]});
 
   const pc=clusters.reduce((s,c)=>s+c.length,0);
   document.getElementById('cnt').textContent='📍 '+pc+'장 / '+clusters.length+'곳'+(activeGroup!=='all'?' ['+activeGroup+']':'');
@@ -164,31 +219,23 @@ function renderMarkers(clusters){
 
 function setFilter(g){
   activeGroup=g;
-  if(g==='all'){
-    renderMarkers(allClusters);
-  }else{
-    const filtered=groupClusters.filter(c=>c[0].group===g);
-    renderMarkers(filtered);
-  }
+  if(g==='all') renderMarkers(allClusters);
+  else renderMarkers(groupClusters.filter(c=>c[0].group===g));
   document.querySelectorAll('.fbtn').forEach(b=>{
-    b.classList.toggle('on', b.dataset.g===g);
+    b.classList.toggle('on',b.dataset.g===g);
   });
 }
 
 const filtersEl=document.getElementById('filters');
 const allBtn=document.createElement('button');
-allBtn.className='fbtn all on';
-allBtn.textContent='전체';
-allBtn.dataset.g='all';
-allBtn.onclick=()=>setFilter('all');
+allBtn.className='fbtn all on'; allBtn.textContent='전체';
+allBtn.dataset.g='all'; allBtn.onclick=()=>setFilter('all');
 filtersEl.appendChild(allBtn);
 
 groups.forEach(g=>{
   const btn=document.createElement('button');
-  btn.className='fbtn';
-  btn.style.background=GROUP_COLORS[g];
-  btn.textContent=g;
-  btn.dataset.g=g;
+  btn.className='fbtn'; btn.style.background=GROUP_COLORS[g];
+  btn.textContent=g; btn.dataset.g=g;
   btn.onclick=()=>setFilter(g);
   filtersEl.appendChild(btn);
 });
