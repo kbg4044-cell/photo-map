@@ -19,10 +19,10 @@ jobs:
       - name: Python으로 HTML 생성
         run: python generate_map.py
 
-      - name: index.html 강제 커밋
-        uses: stefanzweifel/git-auto-commit-action@v5
-        with:
-          commit_message: "지도 자동 업데이트"
-          file_pattern: index.html
-          push_options: '--force'
-          skip_dirty_check: true
+      - name: index.html 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --staged --quiet || git commit -m "지도 자동 업데이트"
+          git push
