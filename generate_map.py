@@ -10,7 +10,7 @@ GROUP_COLORS = {
     'C조': '#1D9E75',
     'D조': '#378ADD',
     'E조': '#7F77DD',
-    'F조': '#D4537E',
+    
 }
 DEFAULT_COLOR = '#888780'
 
